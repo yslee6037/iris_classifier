@@ -246,44 +246,34 @@ class CountingDealingPartition(DealingPartition):
 
 
 class TrainingData:
-    def __init__(self, name) -> None:
+    partition_class = CountingDealingPartition
+
+    def __init__(self, name: str) -> None:
         self.name = name
         self.uploaded: datetime.datetime
         self.tested: datetime.datetime
-        self.training: list[KnownSample] = []
-        self.testing: list[KnownSample] = []
+        self.training: list[TrainingKnownSample] = []
+        self.testing: list[TestingKnownSample] = []
         self.tuning: list[Hyperparameter] = []
- 
 
-    def load(self, raw_data_source : Iterable[dict[str,str]]) -> None: 
-        for n, row in enumerate(raw_data_source):
-            if n % 5 == 0:
-                test = TestingKnownSample(
-                     species = row["species"],
-                     sepal_length = float(row["sepal_length"]),
-                     sepal_width = float(row["sepal_width"]),
-                     petal_length = float(row["petal_length"]),
-                     petal_width = float(row["petal_width"])
-                     
-                )
-                self.testing.append(test)
-            else:
-                train = TrainingKnownSample(
-                     species = row["species"],
-                     sepal_length = float(row["sepal_length"]),
-                     sepal_width = float(row["sepal_width"]),
-                     petal_length = float(row["petal_length"]),
-                     petal_width = float(row["petal_width"])
-                )
-                self.testing.append(test)
+    def load(self, raw_data_iter: Iterable[SampleDict]) -> None:
+        """Extract TestingKnownSample and TrainingKnownSample from raw data"""
+        # Needed to avoid making look like a method
+        partition_class = self.partition_class
+        partitioner = partition_class(raw_data_iter, training_subset=(1, 2))
+        self.training = partitioner.training
+        self.testing = partitioner.testing
         self.uploaded = datetime.datetime.now(tz=datetime.timezone.utc)
 
-    def test(self, parameter : Hyperparameter) -> None: 
+    def test(self, parameter: Hyperparameter) -> None:
+        """Test this hyperparamater value."""
         parameter.test()
         self.tuning.append(parameter)
         self.tested = datetime.datetime.now(tz=datetime.timezone.utc)
 
-    def classify(self, parameter : Hyperparameter, sample : Sample) -> ClassifiedSample:  
+    def classify(
+        self, parameter: Hyperparameter, sample: UnknownSample
+    ) -> ClassifiedSample:
         return ClassifiedSample(
-            classification = parameter.classify(sample), sample = sample
+            classification=parameter.classify(sample), sample=sample
         )
